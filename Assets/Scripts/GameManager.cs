@@ -44,6 +44,7 @@ public class GameManager : MonoBehaviour
     //Boolean to check bets whether betted or not
     private bool aiBetted = false;
     private bool playerBetted = false;
+    private bool aiCheck = false;
     private void Start()
     {
         // Add on click listeners to the buttons
@@ -58,44 +59,33 @@ public class GameManager : MonoBehaviour
 
     private void AIBet()
     {
-        if (!gameStarted)
-        {
-            checkBtn.interactable = false;
-            aiBet = 10;
-            dealerScript.AdjustMoney(-10);
-        }
-
-        else
-        {
-            aiBet = 0;
-        }
-
-        aiBetted = true;
-        pot += aiBet;
-        
-        if (aiBet == 0)
+        if (playerBetted && bet == aiBet)
         {
             checkBtn.interactable = true;
+            aiCheck = true;
         }
 
         else
         {
             checkBtn.interactable = false;
+            aiCheck = false;
+        }
+        
+        if (!aiCheck)
+        {
+            aiBet = 10;
+            dealerScript.AdjustMoney(-10);
+            
+            aiBetted = true;
+            pot += aiBet;
         }
 
+        playerBetted = false;
         UpdateUI();
     }
     
     private void UpdateUI()
     {
-        if (gameStarted)
-        {
-            if (bet < aiBet)
-            {
-                raiseBtn.interactable = false;
-            }
-        }
-
         if (aiBetted)
         {
             potText.text = "Pot: ₺" + pot.ToString();
@@ -115,7 +105,6 @@ public class GameManager : MonoBehaviour
             bettedText.text = "Bet: ₺" + bet.ToString();
             cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
             betText.text = "₺" + bet.ToString();
-            playerBetted = false;
         }
     }
 
@@ -123,7 +112,6 @@ public class GameManager : MonoBehaviour
     {
         if (playerScript.GetMoney() > 0)
         {
-            checkBtn.interactable = false;
             bet += 10;
             playerScript.AdjustMoney(-10);
             cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
@@ -133,18 +121,12 @@ public class GameManager : MonoBehaviour
     
     private void DecrementClicked()
     {
-        if (bet > aiBet)
+        if (bet > aiBet && bet > 0)
         {
             bet += -10;
             playerScript.AdjustMoney(10);
             cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
             betText.text = "₺" + bet.ToString();
-
-            if (bet == 0 && aiBet == 0)
-            {
-                checkBtn.interactable = true;
-            }
-            
         }
         
     }
@@ -153,11 +135,12 @@ public class GameManager : MonoBehaviour
     {
         playerBetted = true;
         UpdateUI();
-        ShuffleAndDealCards();
+        AIBet();
     }
     
     private void CheckClicked()
     {
+        checkBtn.interactable = false;
         playerBetted = true;
         UpdateUI();
         ShuffleAndDealCards();
@@ -182,13 +165,10 @@ public class GameManager : MonoBehaviour
             }
 
             gameStarted = true;
-            AIBet();
         }
 
         else
         {
-            AIBet();
-
             if (cardCount == 3)
             {
                 publicDeal = true;
