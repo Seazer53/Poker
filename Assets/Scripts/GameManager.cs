@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.UI;
@@ -204,47 +206,178 @@ public class GameManager : MonoBehaviour
         RoundOver();
     }
 
-    // Check for winnner and loser, hand is over
+    // Check for winner and loser, hand is over
     void RoundOver()
     {
-        // Booleans (true/false) for bust and blackjack/21
-        bool playerBust = playerScript.handValue > 21;
-        bool dealerBust = dealerScript.handValue > 21;
-
-        // If stand has been clicked less than twice, no 21s or busts, quit function
+        bool roundOver = false;
+        bool exists = false;
+        bool ace = false;
         
-        bool roundOver = true;
+        bool royalFlush = false;
+        bool straightFlush = false;
+        bool fourOfAKind = false;
+        bool fullHouse = false;
+        bool flush = false;
+        bool straight = false;
+        bool threeOfAKind = false;
+        bool twoPair = false;
+        bool onePair = false;
+        
 
-        // All bust, bets returned
-        if (playerBust && dealerBust)
+        int heartsCount = 0;
+        int diamondsCount = 0;
+        int spadesCount = 0;
+        int clubsCount = 0;
+
+        int cardCount = 0;
+        
+        List<string> publicCards = publicScript.GetCardNames();
+        List<string> playerCards = playerScript.GetCardNames();
+        List<string[]> combinationCards = new List<string[]>();
+        List<int> cardNumbers = new List<int>();
+
+        publicCards.Insert(0, playerCards[1]);
+        publicCards.Insert(0, playerCards[0]);
+
+        var result = Combinations(publicCards.ToArray());
+
+        foreach (var item in result)
         {
-            mainText.text = "Tie! Bet splitted";
-            playerScript.AdjustMoney(pot / 2);
+            if (item.Length == 5)
+            {
+                var a = string.Join(", ", item);
+                exists = combinationCards.Any(s => s.Contains(a));
+                
+                if (!exists)
+                {
+                    combinationCards.Add(a.Split(','));
+                }
+            }
         }
 
-        // if player busts, dealer didnt, or if dealer has more points, dealer wins
-        else if (playerBust || (!dealerBust && dealerScript.handValue > playerScript.handValue))
+        foreach (var cards in combinationCards)
         {
-            mainText.text = "YOU LOST!";
-        }
+            foreach (var card in cards)
+            {
+                int index = card.IndexOf("s", StringComparison.Ordinal);
 
-        // if dealer busts, player didnt, or player has more points, player wins
-        else if (dealerBust || playerScript.handValue > dealerScript.handValue)
-        {
-            mainText.text = "YOU WIN!";
-            playerScript.AdjustMoney(pot);
-        }
+                switch (card.Substring(index + 1))
+                {
+                    case "J":
+                        cardNumbers.Add(11);
+                        break;
+                    case "Q":
+                        cardNumbers.Add(12);
+                        break;
+                    case "K":
+                        cardNumbers.Add(13);
+                        break;
+                    case "A":
+                        cardNumbers.Add(14);
+                        ace = true;
+                        break;
+                    default:
+                    {
+                        int num = Int32.Parse(card.Substring(index + 1));
+                        cardNumbers.Add(num);
+                        break;
+                    }
+                }
 
-        //Check for tie, return bets
-        else if (playerScript.handValue == dealerScript.handValue)
-        {
-            mainText.text = "Tie: Bet splitted";
-            playerScript.AdjustMoney(pot / 2);
-        }
+                if (card.Contains("Hearts"))
+                {
+                    heartsCount++;
+                }
+                
+                else if (card.Contains("Diamonds"))
+                {
+                    diamondsCount++;
+                }
+                
+                else if (card.Contains("Spades"))
+                {
+                    spadesCount++;
+                }
+                
+                else if (card.Contains("Clubs"))
+                {
+                    clubsCount++;
+                }
+                
+                if (card.Contains("10"))
+                {
+                    cardCount++;
+                }
+                
+                else if (card.Contains("J"))
+                {
+                    cardCount++;
+                }
+                
+                else if (card.Contains("Q"))
+                {
+                    cardCount++;
+                }
+                
+                else if (card.Contains("K"))
+                {
+                    cardCount++;
+                }
+                        
+                else if (card.Contains("A"))
+                {
+                    cardCount++;
+                }
 
-        else
-        {
-            roundOver = false;
+                if (card == cards.Last())
+                {
+                    if (heartsCount == 5 || diamondsCount == 5 || spadesCount == 5 || clubsCount == 5)
+                    {
+                        if (cardCount == 5)
+                        {
+                            royalFlush = true;
+                            break;
+                        }
+                        
+                        cardNumbers.Sort();
+
+                        if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                        {
+                            straightFlush = true;
+                            break;
+                        }
+
+                        if (ace)
+                        {
+                            cardNumbers.Remove(14);
+                            cardNumbers.Add(0);
+                            
+                            if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                            {
+                                straightFlush = true;
+                                break;
+                            }
+                            
+                        }
+                    }
+
+                    heartsCount = 0;
+                    diamondsCount = 0;
+                    spadesCount = 0;
+                    clubsCount = 0;
+                    cardCount = 0;
+                    ace = false;
+                    cardNumbers.Clear();
+
+                }
+            }
+
+            if (royalFlush || straightFlush)
+            {
+                roundOver = true;
+                break;
+            }
+            
         }
 
         // Set ui up for next move / hand / turn
@@ -257,5 +390,18 @@ public class GameManager : MonoBehaviour
             cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
             gameStarted = false;
         }
+    }
+    
+    public static IEnumerable<T[]> Combinations<T>(IEnumerable<T> source) {
+        if (null == source)
+            throw new ArgumentNullException(nameof(source));
+
+        T[] data = source.ToArray();
+
+        return Enumerable
+            .Range(1, 1 << (data.Length))
+            .Select(index => data
+                .Where((v, i) => (index & (1 << i)) != 0)
+                .ToArray());
     }
 }

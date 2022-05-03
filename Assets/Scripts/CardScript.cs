@@ -17,11 +17,6 @@ public class CardScript : MonoBehaviour
         value = newValue;
     }
 
-    public string GetSpriteName()
-    {
-        return GetComponent<SpriteRenderer>().sprite.name;
-    }
-
     public void SetSprite(Sprite newSprite)
     {
         gameObject.GetComponent<SpriteRenderer>().sprite = newSprite;
