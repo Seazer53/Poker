@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.UI;
@@ -259,9 +258,9 @@ public class GameManager : MonoBehaviour
         {
             foreach (var card in cards)
             {
-                int index = card.IndexOf("s", StringComparison.Ordinal);
+                int valueIndex = card.IndexOf("s", StringComparison.Ordinal);
 
-                switch (card.Substring(index + 1))
+                switch (card.Substring(valueIndex + 1))
                 {
                     case "J":
                         cardNumbers.Add(11);
@@ -278,7 +277,7 @@ public class GameManager : MonoBehaviour
                         break;
                     default:
                     {
-                        int num = Int32.Parse(card.Substring(index + 1));
+                        int num = Int32.Parse(card.Substring(valueIndex + 1));
                         cardNumbers.Add(num);
                         break;
                     }
@@ -338,6 +337,21 @@ public class GameManager : MonoBehaviour
                             royalFlush = true;
                             break;
                         }
+
+                        if (ace)
+                        {
+                            cardNumbers.Remove(14);
+                            cardNumbers.Add(1);
+                            
+                            cardNumbers.Sort();
+                            
+                            if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                            {
+                                straightFlush = true;
+                                break;
+                            }
+                            
+                        }
                         
                         cardNumbers.Sort();
 
@@ -347,17 +361,95 @@ public class GameManager : MonoBehaviour
                             break;
                         }
 
+                        flush = true;
+                        break;
+                    }
+
+                    else if ((heartsCount > 0 && heartsCount < 3) && (diamondsCount > 0 && diamondsCount < 3) && (spadesCount > 0 && spadesCount < 3) && (clubsCount > 0 && clubsCount < 3))
+                    {
+                        List<int> countList = new List<int>() { heartsCount, diamondsCount, spadesCount, clubsCount};
+                        int twoCount = 0;
+
+                        foreach (var count in countList)
+                        {
+                            if (count == 2)
+                            {
+                                twoCount++;
+                            }
+                        }
+
+                        var duplicates = cardNumbers.GroupBy(x => x).Where(x => x.Skip(1).Any());
+                        
+                        if (duplicates.Count() == 4 && twoCount == 1)
+                        {
+                            fourOfAKind = true;
+                            break;
+                        }
+
+                        if (duplicates.Count() == 3)
+                        {
+                            threeOfAKind = true;
+                            break;
+                        }
+
+                        bool threeExists = false;
+                        bool twoExists = false;
+        
+                        var countDuplicates = from x in duplicates
+                            group x by x into g
+                            let count = g.Count()
+                            orderby count descending
+                            select new {Value = g.Key, Count = count};
+
+                        foreach (var countDuplicate in countDuplicates)
+                        {
+                            if (countDuplicate.Value.Count() == 3)
+                            {
+                                threeExists = true;
+                            }
+
+                            if (countDuplicate.Value.Count() == 2 && threeExists)
+                            {
+                                fullHouse = true;
+                                break;
+                            }
+
+                            if (countDuplicate.Value.Count() == 2)
+                            {
+                                twoExists = true;
+                            }
+
+                            if (countDuplicate.Value.Count() == 3 && twoExists)
+                            {
+                                fullHouse = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    else
+                    {
                         if (ace)
                         {
                             cardNumbers.Remove(14);
-                            cardNumbers.Add(0);
+                            cardNumbers.Add(1);
+                            
+                            cardNumbers.Sort();
                             
                             if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
                             {
-                                straightFlush = true;
+                                straight = true;
                                 break;
                             }
                             
+                        }
+                        
+                        cardNumbers.Sort();
+
+                        if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                        {
+                            straight = true;
+                            break;
                         }
                     }
 
@@ -372,7 +464,7 @@ public class GameManager : MonoBehaviour
                 }
             }
 
-            if (royalFlush || straightFlush)
+            if (royalFlush || straightFlush || fourOfAKind || fullHouse || flush || straight || threeOfAKind)
             {
                 roundOver = true;
                 break;
