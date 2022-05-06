@@ -451,6 +451,35 @@ public class GameManager : MonoBehaviour
                             straight = true;
                             break;
                         }
+                        
+                        var duplicates = cardNumbers.GroupBy(x => x).Where(x => x.Skip(1).Any());
+                        var countDuplicates = from x in duplicates
+                            group x by x into g
+                            let count = g.Count()
+                            orderby count descending
+                            select new {Value = g.Key, Count = count};
+
+                        int countPairs = 0;
+
+                        foreach (var countDuplicate in countDuplicates)
+                        {
+                            if (countDuplicate.Value.Count() == 2)
+                            {
+                                countPairs++;
+                            }
+                        }
+                        
+                        if (countPairs == 2)
+                        {
+                            twoPair = true;
+                            break;
+                        }
+                        
+                        else if (countPairs == 1)
+                        {
+                            onePair = true;
+                            break;
+                        }
                     }
 
                     heartsCount = 0;
@@ -464,7 +493,7 @@ public class GameManager : MonoBehaviour
                 }
             }
 
-            if (royalFlush || straightFlush || fourOfAKind || fullHouse || flush || straight || threeOfAKind)
+            if (royalFlush || straightFlush || fourOfAKind || fullHouse || flush || straight || threeOfAKind || twoPair || onePair)
             {
                 roundOver = true;
                 break;
