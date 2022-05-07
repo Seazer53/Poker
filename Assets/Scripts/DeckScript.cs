@@ -1,12 +1,10 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class DeckScript : MonoBehaviour
 {
     public Sprite[] cardSprites;
-    int[] cardValues = new int[53];
+    [SerializeField] Sprite cardBackground;
+    int[] cardValues = new int[52];
     int currentIndex = 0;
 
     void Start()
@@ -50,7 +48,7 @@ public class DeckScript : MonoBehaviour
             (cardValues[i], cardValues[j]) = (cardValues[j], cardValues[i]);
         }
         
-        currentIndex = 1;
+        currentIndex = 0;
     }
 
     public int DealCard(CardScript cardScript)
@@ -63,6 +61,6 @@ public class DeckScript : MonoBehaviour
 
     public Sprite GetCardBack()
     {
-        return cardSprites[0];
+        return cardBackground;
     }
 }

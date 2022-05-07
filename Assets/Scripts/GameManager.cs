@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.PlayerLoop;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
@@ -28,24 +26,26 @@ public class GameManager : MonoBehaviour
     public Text betText;
 
     // How much is bet and pot
-    private int pot = 0;
-    private int bet = 0;
-    private int aiBet = 0;
+    private int pot;
+    private int bet;
+    private int aiBet;
 
     // How many cards are dealed
-    private int cardCount = 0;
+    private int cardCount;
     
     //Sprite for card background
-    [SerializeField] Sprite cardBackground;
+    [SerializeField] private GameObject hideCard1;
+    [SerializeField] private GameObject hideCard2;
 
     // Boolean to check if game started or not
-    private bool gameStarted = false;
-    private bool publicDeal = false;
+    private bool gameStarted;
+    private bool publicDeal;
     
     //Boolean to check bets whether betted or not
-    private bool aiBetted = false;
-    private bool playerBetted = false;
-    private bool aiCheck = false;
+    private bool aiBetted;
+    private bool playerBetted;
+    private bool aiCheck;
+    private bool playerFold;
     private void Start()
     {
         // Add on click listeners to the buttons
@@ -89,12 +89,12 @@ public class GameManager : MonoBehaviour
     {
         if (aiBetted)
         {
-            potText.text = "Pot: ₺" + pot.ToString();
+            potText.text = "Pot: ₺" + pot;
             
             bet = aiBet;
             playerScript.AdjustMoney(-bet);
-            cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
-            betText.text = "₺" + bet.ToString();
+            cashText.text = "Money: ₺" + playerScript.GetMoney();
+            betText.text = "₺" + bet;
             
             aiBetted = false;
         }
@@ -102,10 +102,10 @@ public class GameManager : MonoBehaviour
         else if (playerBetted)
         {
             pot += bet;
-            potText.text = "Pot: ₺" + pot.ToString();
-            bettedText.text = "Bet: ₺" + bet.ToString();
-            cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
-            betText.text = "₺" + bet.ToString();
+            potText.text = "Pot: ₺" + pot;
+            bettedText.text = "Bet: ₺" + bet;
+            cashText.text = "Money: ₺" + playerScript.GetMoney();
+            betText.text = "₺" + bet;
         }
     }
 
@@ -115,8 +115,8 @@ public class GameManager : MonoBehaviour
         {
             bet += 10;
             playerScript.AdjustMoney(-10);
-            cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
-            betText.text = "₺" + bet.ToString();
+            cashText.text = "Money: ₺" + playerScript.GetMoney();
+            betText.text = "₺" + bet;
         }
     }
     
@@ -126,8 +126,8 @@ public class GameManager : MonoBehaviour
         {
             bet += -10;
             playerScript.AdjustMoney(10);
-            cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
-            betText.text = "₺" + bet.ToString();
+            cashText.text = "Money: ₺" + playerScript.GetMoney();
+            betText.text = "₺" + bet;
         }
         
     }
@@ -159,11 +159,9 @@ public class GameManager : MonoBehaviour
 
             playerScript.StartHand();
             dealerScript.StartHand();
-
-            for (int i = 0; i < dealerScript.hand.Length; i++)
-            {
-                dealerScript.hand[i].GetComponent<SpriteRenderer>().sprite = cardBackground;
-            }
+            
+            hideCard1.GetComponent<SpriteRenderer>().enabled = true;
+            hideCard2.GetComponent<SpriteRenderer>().enabled = true;
 
             gameStarted = true;
         }
@@ -202,36 +200,53 @@ public class GameManager : MonoBehaviour
 
     private void FoldClicked()
     {
+        playerFold = true;
         RoundOver();
     }
 
-    // Check for winner and loser, hand is over
-    void RoundOver()
+    private void RoundOver()
     {
-        bool roundOver = false;
-        bool exists = false;
+        if (playerFold)
+        {
+            Debug.Log("PLAYER FOLDS, AI WON!");
+        }
+
+        else
+        {
+            List<string> playerCards = playerScript.GetCardNames();
+            List<string> aiCards = dealerScript.GetCardNames();
+            List<string> publicCards = publicScript.GetCardNames();
+        
+            var playerHandValue = EvaluateHand(playerCards, publicCards);
+            var aiHandValue = EvaluateHand(aiCards, publicCards);
+
+            if (playerHandValue > aiHandValue)
+            {
+                Debug.Log("Player won!");
+            }
+
+            else
+            {
+                Debug.Log("YOU LOST!");
+            }
+        }
+
+    }
+
+    // Check for winner and loser, hand is over
+    private int EvaluateHand(List<string> playerCards, List<string> publicCards)
+    {
+        bool exists;
         bool ace = false;
         
-        bool royalFlush = false;
-        bool straightFlush = false;
-        bool fourOfAKind = false;
-        bool fullHouse = false;
-        bool flush = false;
-        bool straight = false;
-        bool threeOfAKind = false;
-        bool twoPair = false;
-        bool onePair = false;
-        
-
         int heartsCount = 0;
         int diamondsCount = 0;
         int spadesCount = 0;
         int clubsCount = 0;
 
         int cardCount = 0;
+        int score = 0;
         
-        List<string> publicCards = publicScript.GetCardNames();
-        List<string> playerCards = playerScript.GetCardNames();
         List<string[]> combinationCards = new List<string[]>();
         List<int> cardNumbers = new List<int>();
 
@@ -264,21 +279,31 @@ public class GameManager : MonoBehaviour
                 {
                     case "J":
                         cardNumbers.Add(11);
+                        cardCount++;
                         break;
                     case "Q":
                         cardNumbers.Add(12);
+                        cardCount++;
                         break;
                     case "K":
                         cardNumbers.Add(13);
+                        cardCount++;
                         break;
                     case "A":
                         cardNumbers.Add(14);
+                        cardCount++;
                         ace = true;
                         break;
                     default:
                     {
-                        int num = Int32.Parse(card.Substring(valueIndex + 1));
+                        var num = int.Parse(card.Substring(valueIndex + 1));
                         cardNumbers.Add(num);
+                        
+                        if (num == 10)
+                        {
+                            cardCount++;
+                        }
+                        
                         break;
                     }
                 }
@@ -302,31 +327,6 @@ public class GameManager : MonoBehaviour
                 {
                     clubsCount++;
                 }
-                
-                if (card.Contains("10"))
-                {
-                    cardCount++;
-                }
-                
-                else if (card.Contains("J"))
-                {
-                    cardCount++;
-                }
-                
-                else if (card.Contains("Q"))
-                {
-                    cardCount++;
-                }
-                
-                else if (card.Contains("K"))
-                {
-                    cardCount++;
-                }
-                        
-                else if (card.Contains("A"))
-                {
-                    cardCount++;
-                }
 
                 if (card == cards.Last())
                 {
@@ -334,40 +334,50 @@ public class GameManager : MonoBehaviour
                     {
                         if (cardCount == 5)
                         {
-                            royalFlush = true;
-                            break;
-                        }
-
-                        if (ace)
-                        {
-                            cardNumbers.Remove(14);
-                            cardNumbers.Add(1);
-                            
-                            cardNumbers.Sort();
-                            
-                            if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
-                            {
-                                straightFlush = true;
-                                break;
-                            }
-                            
+                            score = 10;
+                            return score;
                         }
                         
-                        cardNumbers.Sort();
-
-                        if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                        if (score < 9)
                         {
-                            straightFlush = true;
-                            break;
+                            if (ace)
+                            {
+                                cardNumbers.Remove(14);
+                                cardNumbers.Add(1);
+                            
+                                cardNumbers.Sort();
+                            
+                                if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                                {
+                                    score = 9;
+                                }
+                            
+                            }
+
+                            else
+                            {
+                                cardNumbers.Sort();
+
+                                if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                                {
+                                    score = 9;
+                                }
+                            }
                         }
 
-                        flush = true;
-                        break;
+                        if (score < 6)
+                        {
+                            score = 6;
+                        }
                     }
+                    
+                    var duplicates = cardNumbers.GroupBy(x => x).Where(x => x.Skip(1).Any());
 
-                    else if ((heartsCount > 0 && heartsCount < 3) && (diamondsCount > 0 && diamondsCount < 3) && (spadesCount > 0 && spadesCount < 3) && (clubsCount > 0 && clubsCount < 3))
+                    int countPairs = 0;
+
+                    if ((heartsCount > 0 && heartsCount < 3) && (diamondsCount > 0 && diamondsCount < 3) && (spadesCount > 0 && spadesCount < 3) && (clubsCount > 0 && clubsCount < 3))
                     {
-                        List<int> countList = new List<int>() { heartsCount, diamondsCount, spadesCount, clubsCount};
+                        List<int> countList = new List<int> { heartsCount, diamondsCount, spadesCount, clubsCount};
                         int twoCount = 0;
 
                         foreach (var count in countList)
@@ -378,107 +388,91 @@ public class GameManager : MonoBehaviour
                             }
                         }
 
-                        var duplicates = cardNumbers.GroupBy(x => x).Where(x => x.Skip(1).Any());
+                        if (duplicates.Count() == 4 && twoCount == 1 && score < 8)
+                        {
+                            score = 8;
+                        }
+
+                        if (duplicates.Count() == 3 && score < 4)
+                        {
+                            score = 4;
+                        }
+
+                        if (score < 7)
+                        {
+                            bool threeExists = false;
+                            bool twoExists = false;
                         
-                        if (duplicates.Count() == 4 && twoCount == 1)
-                        {
-                            fourOfAKind = true;
-                            break;
-                        }
+                            var countDuplicates = from x in duplicates
+                                group x by x into g
+                                let count = g.Count()
+                                orderby count descending
+                                select new {Value = g.Key, Count = count};
 
-                        if (duplicates.Count() == 3)
-                        {
-                            threeOfAKind = true;
-                            break;
-                        }
-
-                        bool threeExists = false;
-                        bool twoExists = false;
-        
-                        var countDuplicates = from x in duplicates
-                            group x by x into g
-                            let count = g.Count()
-                            orderby count descending
-                            select new {Value = g.Key, Count = count};
-
-                        foreach (var countDuplicate in countDuplicates)
-                        {
-                            if (countDuplicate.Value.Count() == 3)
+                            foreach (var countDuplicate in countDuplicates)
                             {
-                                threeExists = true;
-                            }
+                                if (countDuplicate.Value.Count() == 3)
+                                {
+                                    threeExists = true;
+                                }
 
-                            if (countDuplicate.Value.Count() == 2 && threeExists)
-                            {
-                                fullHouse = true;
-                                break;
-                            }
+                                if (countDuplicate.Value.Count() == 2 && threeExists)
+                                {
+                                    score = 7;
+                                }
 
-                            if (countDuplicate.Value.Count() == 2)
-                            {
-                                twoExists = true;
-                            }
+                                if (countDuplicate.Value.Count() == 2)
+                                {
+                                    twoExists = true;
+                                    countPairs++;
+                                }
 
-                            if (countDuplicate.Value.Count() == 3 && twoExists)
-                            {
-                                fullHouse = true;
-                                break;
+                                if (countDuplicate.Value.Count() == 3 && twoExists)
+                                {
+                                    score = 7;
+                                }
                             }
                         }
+
+                        if (countPairs == 2 && score < 3)
+                        {
+                            score = 3;
+                        }
+
+                        if (countPairs == 1 && score < 2)
+                        {
+                            score = 2;
+                        }
+                        
                     }
 
                     else
                     {
-                        if (ace)
+                        if (score < 5)
                         {
-                            cardNumbers.Remove(14);
-                            cardNumbers.Add(1);
-                            
-                            cardNumbers.Sort();
-                            
-                            if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                            if (ace)
                             {
-                                straight = true;
-                                break;
-                            }
+                                cardNumbers.Remove(14);
+                                cardNumbers.Add(1);
                             
-                        }
-                        
-                        cardNumbers.Sort();
-
-                        if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
-                        {
-                            straight = true;
-                            break;
-                        }
-                        
-                        var duplicates = cardNumbers.GroupBy(x => x).Where(x => x.Skip(1).Any());
-                        var countDuplicates = from x in duplicates
-                            group x by x into g
-                            let count = g.Count()
-                            orderby count descending
-                            select new {Value = g.Key, Count = count};
-
-                        int countPairs = 0;
-
-                        foreach (var countDuplicate in countDuplicates)
-                        {
-                            if (countDuplicate.Value.Count() == 2)
-                            {
-                                countPairs++;
+                                cardNumbers.Sort();
+                            
+                                if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                                {
+                                    score = 5;
+                                }
+                            
                             }
-                        }
-                        
-                        if (countPairs == 2)
-                        {
-                            twoPair = true;
-                            break;
-                        }
-                        
-                        else if (countPairs == 1)
-                        {
-                            onePair = true;
-                            break;
+
+                            else
+                            {
+                                cardNumbers.Sort();
+
+                                if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                                {
+                                    score = 5;
+                                }
+                            }
                         }
                     }
 
@@ -492,28 +486,12 @@ public class GameManager : MonoBehaviour
 
                 }
             }
-
-            if (royalFlush || straightFlush || fourOfAKind || fullHouse || flush || straight || threeOfAKind || twoPair || onePair)
-            {
-                roundOver = true;
-                break;
-            }
-            
         }
-
-        // Set ui up for next move / hand / turn
-        if (roundOver)
-        {
-            raiseBtn.gameObject.SetActive(false);
-            checkBtn.gameObject.SetActive(false);
-            foldBtn.gameObject.SetActive(true);
-            mainText.gameObject.SetActive(true);
-            cashText.text = "Money: ₺" + playerScript.GetMoney().ToString();
-            gameStarted = false;
-        }
+        
+        return score;
     }
-    
-    public static IEnumerable<T[]> Combinations<T>(IEnumerable<T> source) {
+
+    private static IEnumerable<T[]> Combinations<T>(IEnumerable<T> source) {
         if (null == source)
             throw new ArgumentNullException(nameof(source));
 
