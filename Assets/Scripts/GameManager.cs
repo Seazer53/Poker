@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
 
 public class GameManager : MonoBehaviour
 {
@@ -29,6 +30,12 @@ public class GameManager : MonoBehaviour
     private int pot;
     private int bet;
     private int aiBet;
+    private int roundCount = 0;
+
+    // Ai check variables
+    private float checkProb = 0.1f;
+    private float randomValue;
+    private float foldProb = 0.0f;
 
     // How many cards are dealed
     private int cardCount;
@@ -42,10 +49,26 @@ public class GameManager : MonoBehaviour
     private bool publicDeal;
     
     //Boolean to check bets whether betted or not
-    private bool aiBetted;
-    private bool playerBetted;
+    private bool aiRaised;
+    private bool playerRaised;
     private bool aiCheck;
+    private bool playerCheck;
     private bool playerFold;
+    private bool aiFold;
+    private bool init = true;
+    private bool firstBet;
+    private bool aiWillCheck;
+    private bool callAIBet = false;
+    private bool gameOver = false;
+
+    private string logString = "";
+    
+    void Awake()
+    {
+        DontDestroyOnLoad(playerScript);
+        DontDestroyOnLoad(dealerScript);
+    }
+    
     private void Start()
     {
         // Add on click listeners to the buttons
@@ -54,58 +77,269 @@ public class GameManager : MonoBehaviour
         foldBtn.onClick.AddListener(() => FoldClicked());
         incrementBtn.onClick.AddListener(() => IncrementClicked());
         decrementBtn.onClick.AddListener(() => DecrementClicked());
-        
+
+        logString = "Game Started!\n";
+        mainText.text = logString;
+
+        firstBet = true;
         AIBet();
     }
 
     private void AIBet()
     {
-        if (playerBetted && bet == aiBet)
+        randomValue = Random.value;
+        roundCount++;
+        checkProb *= roundCount;
+        foldProb += roundCount / 50f;
+
+        if (playerRaised && aiBet == bet && randomValue < checkProb)
         {
-            checkBtn.interactable = true;
+            aiWillCheck = true;
+            playerRaised = false;
+        }
+            
+        else if (randomValue < foldProb)
+        {
+            aiFold = true;
+            gameOver = true;
+            RoundOver();
+            return;
+        }
+
+        else if (aiBet > bet && !init)
+        {
+            bet = aiBet;
+        }
+
+        else if (aiBet < bet && !init)
+        {
+            aiBet = bet;
+        }
+
+        else if(init)
+        {
+            bet = 10;
+        }
+
+        if (!aiWillCheck)
+        {
+            if (gameStarted)
+            {
+                List<string> aiCards = dealerScript.GetCardNames();
+                List<int> aiCardNumbers = new List<int>();
+
+                foreach (var card in aiCards)
+                {
+                    int valueIndex = card.IndexOf("s", StringComparison.Ordinal);
+
+                    switch (card.Substring(valueIndex + 1))
+                    {
+                        case "J":
+                            aiCardNumbers.Add(11);
+                            break;
+                        case "Q":
+                            aiCardNumbers.Add(12);
+                            break;
+                        case "K":
+                            aiCardNumbers.Add(13);
+                            break;
+                        case "A":
+                            aiCardNumbers.Add(14);
+                            break;
+                        default:
+                        {
+                            var num = int.Parse(card.Substring(valueIndex + 1));
+                            aiCardNumbers.Add(num);
+                            break;
+                        }
+                    }
+                }
+
+                int sum = aiCardNumbers[0] + aiCardNumbers[1];
+
+                if (sum < 5)
+                {
+                    int randomMultiplier = Random.Range(0, 4);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 8)
+                {
+                    int randomMultiplier = Random.Range(1, 4);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 11)
+                {
+                    int randomMultiplier = Random.Range(1, 5);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 14)
+                {
+                    int randomMultiplier = Random.Range(2, 5);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 17)
+                {
+                    int randomMultiplier = Random.Range(2, 6);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 21)
+                {
+                    int randomMultiplier = Random.Range(3, 7);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 25)
+                {
+                    int randomMultiplier = Random.Range(3, 9);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            
+                else if (sum < 29)
+                {
+                    int randomMultiplier = Random.Range(4, 11);
+                    aiBet = bet + (randomMultiplier * 10);
+                }
+            }
+            
+            else
+            {
+                aiBet = bet;
+                checkProb *= 6f;
+            }
+        }
+
+        if (init)
+        {
+            bet = aiBet;
+            betText.text = "₺" + aiBet;
+            init = false;
+                
+            dealerScript.AdjustMoney(-aiBet);
+            pot += aiBet;
             aiCheck = true;
+
+            logString += "AI Raised: " + aiBet + "\n";
+            mainText.text = logString;
+                
         }
 
         else
         {
-            checkBtn.interactable = false;
+            if ((randomValue < checkProb || playerCheck) && aiWillCheck)
+            {
+                checkBtn.interactable = true;
+                aiCheck = true;
+                aiWillCheck = false;
+
+                if (!gameStarted)
+                {
+                    checkProb = 0.1f;
+                }
+
+                logString += "AI Checked! \n";
+                mainText.text = logString;
+                    
+                bet = aiBet;
+                betText.text = "₺" + bet;
+            }
+
+            else
+            {
+                dealerScript.AdjustMoney(-aiBet);
+                pot += aiBet;
+                aiRaised = true;
+
+                checkBtn.interactable = false;
+
+                logString += "AI Raised: " + aiBet + "\n";
+                mainText.text = logString;
+
+                bet = aiBet;
+                betText.text = "₺" + bet;
+                    
+            }
+        }
+
+        callAIBet = false;
+            
+        if (callAIBet)
+        {
+            UpdateUI();
+        }
+    }
+
+    private void UpdateUI()
+    {
+        if (playerRaised || playerCheck)
+        {
+            pot += bet;
+            playerScript.AdjustMoney(-bet);
+        
+            bettedText.text = "Bet: ₺" + bet;
+            cashText.text = "Money: ₺" + playerScript.GetMoney();
+        }
+        
+        potText.text = "Pot: ₺" + pot;
+
+        if (playerRaised)
+        {
             aiCheck = false;
         }
         
-        if (!aiCheck)
+        if (aiRaised && !firstBet)
         {
-            aiBet = 10;
-            dealerScript.AdjustMoney(-10);
-            
-            aiBetted = true;
-            pot += aiBet;
-        }
-
-        playerBetted = false;
-        UpdateUI();
-    }
-    
-    private void UpdateUI()
-    {
-        if (aiBetted)
-        {
-            potText.text = "Pot: ₺" + pot;
-            
-            bet = aiBet;
-            playerScript.AdjustMoney(-bet);
-            cashText.text = "Money: ₺" + playerScript.GetMoney();
-            betText.text = "₺" + bet;
-            
-            aiBetted = false;
+            playerCheck = false;
+            aiRaised = false;
+            checkBtn.interactable = false;
         }
         
-        else if (playerBetted)
+        else if(aiCheck)
         {
-            pot += bet;
-            potText.text = "Pot: ₺" + pot;
-            bettedText.text = "Bet: ₺" + bet;
-            cashText.text = "Money: ₺" + playerScript.GetMoney();
-            betText.text = "₺" + bet;
+            checkBtn.interactable = true;
+        }
+
+        if (aiCheck && playerCheck && !gameOver)
+        {
+            roundCount = 0;
+            checkProb = 0.1f;
+            foldProb = 0.0f;
+
+            if (cardCount != 5)
+            {
+                logString += "Dealing Cards... \n";
+                mainText.text = logString;
+            }
+
+            aiCheck = false;
+            aiRaised = false;
+            aiFold = false;
+            
+            playerCheck = false;
+            playerRaised = false;
+            
+            firstBet = false;
+
+            aiBet = 10;
+            bet = 10;
+
+            callAIBet = true;
+            
+            ShuffleAndDealCards();
+        }
+        
+        else if (playerCheck || playerRaised)
+        {
+            callAIBet = true;
+        }
+
+        if (callAIBet && !aiFold && !gameOver)
+        {
+            AIBet();
         }
     }
 
@@ -114,19 +348,15 @@ public class GameManager : MonoBehaviour
         if (playerScript.GetMoney() > 0)
         {
             bet += 10;
-            playerScript.AdjustMoney(-10);
-            cashText.text = "Money: ₺" + playerScript.GetMoney();
             betText.text = "₺" + bet;
         }
     }
     
     private void DecrementClicked()
     {
-        if (bet > aiBet && bet > 0)
+        if (bet > aiBet)
         {
             bet += -10;
-            playerScript.AdjustMoney(10);
-            cashText.text = "Money: ₺" + playerScript.GetMoney();
             betText.text = "₺" + bet;
         }
         
@@ -134,17 +364,29 @@ public class GameManager : MonoBehaviour
 
     private void RaiseClicked()
     {
-        playerBetted = true;
-        UpdateUI();
-        AIBet();
+        playerRaised = true;
+        
+        logString += "Player Raised: " + bet + "\n";
+        mainText.text = logString;
+
+        if (!gameOver)
+        {
+            UpdateUI();
+        }
     }
     
     private void CheckClicked()
     {
         checkBtn.interactable = false;
-        playerBetted = true;
-        UpdateUI();
-        ShuffleAndDealCards();
+        playerCheck = true;
+        
+        logString += "Player Checked!\n";
+        mainText.text = logString;
+        
+        if (!gameOver)
+        {
+            UpdateUI();
+        }
     }
 
     private void ShuffleAndDealCards()
@@ -175,6 +417,7 @@ public class GameManager : MonoBehaviour
 
             if (cardCount == 5)
             {
+                gameOver = true;
                 RoundOver();
             }
 
@@ -201,6 +444,11 @@ public class GameManager : MonoBehaviour
     private void FoldClicked()
     {
         playerFold = true;
+        gameOver = true;
+        
+        logString += "Player Fold!\n";
+        mainText.text = logString;
+        
         RoundOver();
     }
 
@@ -208,7 +456,14 @@ public class GameManager : MonoBehaviour
     {
         if (playerFold)
         {
-            Debug.Log("PLAYER FOLDS, AI WON!");
+            logString += "Player Folds, AI WIN!\n";
+            mainText.text = logString;
+        }
+        
+        else if (aiFold)
+        {
+            logString += "AI Folds, Player WIN!\n";
+            mainText.text = logString;
         }
 
         else
@@ -219,15 +474,20 @@ public class GameManager : MonoBehaviour
         
             var playerHandValue = EvaluateHand(playerCards, publicCards);
             var aiHandValue = EvaluateHand(aiCards, publicCards);
+            
+            hideCard1.SetActive(false);
+            hideCard2.SetActive(false);
 
             if (playerHandValue > aiHandValue)
             {
-                Debug.Log("Player won!");
+                logString += "YOU WIN!\n";
+                mainText.text = logString;
             }
 
             else
             {
-                Debug.Log("YOU LOST!");
+                logString += "YOU LOST!\n";
+                mainText.text = logString;
             }
         }
 
