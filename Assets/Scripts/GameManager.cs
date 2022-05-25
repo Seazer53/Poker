@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
@@ -13,6 +14,7 @@ public class GameManager : MonoBehaviour
     public Button foldBtn;
     public Button incrementBtn;
     public Button decrementBtn;
+    public Button playBtn;
 
     // Access the player and dealer's script
     public PlayerScript playerScript;
@@ -44,6 +46,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject hideCard1;
     [SerializeField] private GameObject hideCard2;
 
+    // End game menu
+    [SerializeField] private GameObject gameOverPanel;
+
     // Boolean to check if game started or not
     private bool gameStarted;
     private bool publicDeal;
@@ -62,13 +67,7 @@ public class GameManager : MonoBehaviour
     private bool gameOver = false;
 
     private string logString = "";
-    
-    void Awake()
-    {
-        DontDestroyOnLoad(playerScript);
-        DontDestroyOnLoad(dealerScript);
-    }
-    
+
     private void Start()
     {
         // Add on click listeners to the buttons
@@ -77,11 +76,59 @@ public class GameManager : MonoBehaviour
         foldBtn.onClick.AddListener(() => FoldClicked());
         incrementBtn.onClick.AddListener(() => IncrementClicked());
         decrementBtn.onClick.AddListener(() => DecrementClicked());
+        playBtn.onClick.AddListener(() => PlayAgain());
 
         logString = "Game Started!\n";
         mainText.text = logString;
 
         firstBet = true;
+        AIBet();
+    }
+    
+    private void PlayAgain()
+    {
+        pot = 0;
+        aiBet = 0;
+        roundCount = 0;
+        checkProb = 0.1f;
+        foldProb = 0.0f;
+        cardCount = 0;
+
+        gameStarted = false;
+        publicDeal = false;
+
+        aiRaised = false;
+        playerRaised = false;
+        aiCheck = false;
+        playerCheck = false;
+        playerFold = false;
+        aiFold = false;
+        
+        init = true;
+        firstBet = true;
+        
+        aiWillCheck = false;
+        callAIBet = false;
+        
+        gameOver = false;
+        
+        logString = "";
+        mainText.text = logString;
+        
+        potText.text = "Pot: ₺" + 0;
+        bettedText.text = "Bet: ₺" + 0;
+
+        playerScript.ResetHand();
+        publicScript.ResetHand();
+        dealerScript.ResetHand();
+
+        hideCard1.GetComponent<SpriteRenderer>().enabled = false;
+        hideCard2.GetComponent<SpriteRenderer>().enabled = false;
+        
+        gameOverPanel.SetActive(false);
+
+        checkBtn.interactable = true;
+        
         AIBet();
     }
 
@@ -473,10 +520,14 @@ public class GameManager : MonoBehaviour
             List<string> publicCards = publicScript.GetCardNames();
         
             var playerHandValue = EvaluateHand(playerCards, publicCards);
+            
+            publicCards.Clear();
+            publicCards = publicScript.GetCardNames();
+            
             var aiHandValue = EvaluateHand(aiCards, publicCards);
             
-            hideCard1.SetActive(false);
-            hideCard2.SetActive(false);
+            hideCard1.GetComponent<SpriteRenderer>().enabled = false;
+            hideCard2.GetComponent<SpriteRenderer>().enabled = false;
 
             if (playerHandValue > aiHandValue)
             {
@@ -484,12 +535,26 @@ public class GameManager : MonoBehaviour
                 mainText.text = logString;
             }
 
-            else
+            else if(aiHandValue > playerHandValue)
             {
                 logString += "YOU LOST!\n";
                 mainText.text = logString;
             }
+
+            else
+            {
+                logString += "DRAW! POT SHARED!\n";
+                mainText.text = logString;
+                
+                playerScript.AdjustMoney(pot / 2);
+                dealerScript.AdjustMoney(pot / 2);
+                
+                cashText.text = "Money: ₺" + playerScript.GetMoney();
+                potText.text = "Pot: ₺" + 0;
+            }
         }
+        
+        gameOverPanel.SetActive(true);
 
     }
 
@@ -632,6 +697,12 @@ public class GameManager : MonoBehaviour
                     }
                     
                     var duplicates = cardNumbers.GroupBy(x => x).Where(x => x.Skip(1).Any());
+                    
+                    var countDuplicates = from x in duplicates
+                        group x by x into g
+                        let count = g.Count()
+                        orderby count descending
+                        select new {Value = g.Key, Count = count};
 
                     int countPairs = 0;
 
@@ -662,12 +733,6 @@ public class GameManager : MonoBehaviour
                         {
                             bool threeExists = false;
                             bool twoExists = false;
-                        
-                            var countDuplicates = from x in duplicates
-                                group x by x into g
-                                let count = g.Count()
-                                orderby count descending
-                                select new {Value = g.Key, Count = count};
 
                             foreach (var countDuplicate in countDuplicates)
                             {
@@ -693,17 +758,6 @@ public class GameManager : MonoBehaviour
                                 }
                             }
                         }
-
-                        if (countPairs == 2 && score < 3)
-                        {
-                            score = 3;
-                        }
-
-                        if (countPairs == 1 && score < 2)
-                        {
-                            score = 2;
-                        }
-                        
                     }
 
                     else
@@ -732,6 +786,27 @@ public class GameManager : MonoBehaviour
                                 {
                                     score = 5;
                                 }
+                            }
+                        }
+
+                        if (score < 3)
+                        {
+                            foreach (var countDuplicate in countDuplicates)
+                            {
+                                if (countDuplicate.Value.Count() == 2)
+                                {
+                                    countPairs++;
+                                }
+                            }
+                        
+                            if (countPairs == 2)
+                            {
+                                score = 3;
+                            }
+
+                            if (countPairs == 1 && score < 2)
+                            {
+                                score = 2;
                             }
                         }
                     }
