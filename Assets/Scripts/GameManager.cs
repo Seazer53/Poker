@@ -4,7 +4,6 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using Random = UnityEngine.Random;
-using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
@@ -65,6 +64,7 @@ public class GameManager : MonoBehaviour
     private bool aiWillCheck;
     private bool callAIBet = false;
     private bool gameOver = false;
+    private bool bankrupt = false;
 
     private string logString = "";
 
@@ -412,9 +412,19 @@ public class GameManager : MonoBehaviour
     private void RaiseClicked()
     {
         playerRaised = true;
-        
-        logString += "Player Raised: " + bet + "\n";
-        mainText.text = logString;
+
+        if (playerScript.GetMoney() - bet < 0)
+        {
+            bankrupt = true;
+            gameOver = true;
+            RoundOver();
+        }
+
+        else
+        {
+            logString += "Player Raised: " + bet + "\n";
+            mainText.text = logString;
+        }
 
         if (!gameOver)
         {
@@ -424,12 +434,22 @@ public class GameManager : MonoBehaviour
     
     private void CheckClicked()
     {
-        checkBtn.interactable = false;
-        playerCheck = true;
+        if (playerScript.GetMoney() - bet < 0)
+        {
+            bankrupt = true;
+            gameOver = true;
+            RoundOver();
+        }
+
+        else
+        {
+            checkBtn.interactable = false;
+            playerCheck = true;
         
-        logString += "Player Checked!\n";
-        mainText.text = logString;
-        
+            logString += "Player Checked!\n";
+            mainText.text = logString;
+        }
+
         if (!gameOver)
         {
             UpdateUI();
@@ -501,16 +521,26 @@ public class GameManager : MonoBehaviour
 
     private void RoundOver()
     {
-        if (playerFold)
+        if (bankrupt)
+        {
+            logString += "Player BANKRUPT!\n";
+            mainText.text = logString;
+        }
+        
+        else if (playerFold)
         {
             logString += "Player Folds, AI WIN!\n";
             mainText.text = logString;
+            
+            dealerScript.AdjustMoney(pot);
         }
         
         else if (aiFold)
         {
             logString += "AI Folds, Player WIN!\n";
             mainText.text = logString;
+            
+            playerScript.AdjustMoney(pot);
         }
 
         else
@@ -667,16 +697,23 @@ public class GameManager : MonoBehaviour
                         {
                             if (ace)
                             {
-                                cardNumbers.Remove(14);
-                                cardNumbers.Add(1);
-                            
                                 cardNumbers.Sort();
                             
                                 if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
                                 {
                                     score = 9;
                                 }
+
+                                cardNumbers.Remove(14);
+                                cardNumbers.Add(1);
+                                
+                                cardNumbers.Sort();
                             
+                                if (cardNumbers.Zip(cardNumbers.Skip(1), (a, b) => (a + 1) == b).All(x => x))
+                                {
+                                    score = 9;
+                                }
+
                             }
 
                             else
